@@ -1,10 +1,11 @@
 ﻿import axios from "axios";
 import { redis } from "./redis.js";
+import "dotenv/config";
 
-const GOOGLE_API_KEY = "AIzaSyDoTlW2p1Hy1kOFcSCR4LyhV4y5i9Czm7E";
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+
 const CACHE_TTL_SECONDS = 21600; // 6 hours
-
-const LOCK_TTL_SECONDS = 10;
+const LOCK_TTL_MS = 15000;       // 15 seconds
 const LOCK_WAIT_MS = 200;
 const LOCK_MAX_WAIT_MS = 5000;
 
@@ -23,7 +24,7 @@ function sleep(ms) {
 async function acquireLock(lockKey) {
     return await redis.set(lockKey, "1", {
         NX: true,
-        EX: LOCK_TTL_SECONDS
+        PX: LOCK_TTL_MS
     });
 }
 
@@ -32,42 +33,41 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
     const rLng = roundCoord(lng);
     const cacheKey = makeCacheKey(rLat, rLng, radius, type);
     const lockKey = `lock:${cacheKey}`;
-    console.log("📍 Request received:", { lat, lng, radius, type });
-    console.log("🔑 Using cache key:", cacheKey);
 
-    // 1️⃣ Check cache first
+    console.log("📍 Request received:", { lat, lng, radius, type });
+    console.log("🔑 Cache key:", cacheKey);
+
+    // 1️⃣ Cache check
     const cached = await redis.get(cacheKey);
     if (cached) {
-        console.log("O CACHE HIT for", cacheKey);
+        console.log("✅ CACHE HIT");
         return JSON.parse(cached);
-    } else {
-        console.log("X CACHE MISS for", cacheKey);
     }
 
-    // 2️⃣ Try to acquire lock
+    console.log("❌ CACHE MISS");
+
+    // 2️⃣ Lock attempt
     const lockAcquired = await acquireLock(lockKey);
 
     if (!lockAcquired) {
-        console.log("🟡 LOCK HELD — waiting for cache", lockKey);
+        console.log("⏳ LOCK HELD — waiting");
 
         const start = Date.now();
         while (Date.now() - start < LOCK_MAX_WAIT_MS) {
             await sleep(LOCK_WAIT_MS);
-
-            const retryCache = await redis.get(cacheKey);
-            if (retryCache) {
-                console.log("🟢 CACHE HIT (after wait)");
-                return JSON.parse(retryCache);
+            const retry = await redis.get(cacheKey);
+            if (retry) {
+                console.log("🔁 CACHE FILLED BY OTHER REQUEST");
+                return JSON.parse(retry);
             }
         }
 
-        console.log("🔴 LOCK TIMEOUT — calling Google anyway");
-    } else {
-        console.log("🔒 LOCK ACQUIRED");
+        throw new Error("Lock timeout waiting for cache fill");
     }
 
-    // 3️⃣ Call Google Places
-    console.log("🔴 CALLING GOOGLE for", cacheKey);
+    console.log("🔒 LOCK ACQUIRED — calling Google");
+
+    // 3️⃣ Google Places call
     const response = await axios.get(
         "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
         {
@@ -88,15 +88,17 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
         rating: p.rating ?? null
     }));
 
-    // 4️⃣ Cache results
+    // 4️⃣ Cache result
     await redis.setEx(
         cacheKey,
         CACHE_TTL_SECONDS,
         JSON.stringify(places)
     );
 
-    // 5️⃣ Release lock (best-effort)
+    // 5️⃣ Release lock
     await redis.del(lockKey);
+
+    console.log("💾 CACHE STORED — lock released");
 
     return places;
 }
