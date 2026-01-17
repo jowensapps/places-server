@@ -102,3 +102,28 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
 
     return places;
 }
+
+export async function getNearbyPlacesHandler(req, res) {
+    try {
+        const lat = Number(req.query.lat);
+        const lng = Number(req.query.lng);
+        const radius = Number(req.query.radius ?? 100);
+        const type = req.query.type ?? "restaurant";
+
+        if (!lat || !lng) {
+            return res.status(400).json({ error: "Missing lat/lng" });
+        }
+
+        const places = await getNearbyPlaces({
+            lat,
+            lng,
+            radius,
+            type
+        });
+
+        res.json(places);
+    } catch (err) {
+        console.error("❌ Nearby places failed:", err);
+        res.status(500).json([]);
+    }
+}

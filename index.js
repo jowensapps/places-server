@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 /**
- * Health check
+ * Health check (used by UptimeRobot)
  */
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
@@ -20,23 +20,30 @@ app.get("/health", (req, res) => {
 
 /**
  * Places Nearby endpoint
+ *
  * Example:
+ * /places?lat=33.749&lng=-84.388
  * /places?lat=33.749&lng=-84.388&radius=500&type=restaurant
  */
 app.get("/places", async (req, res) => {
     try {
-        const { lat, lng, radius, type } = req.query;
+        const lat = Number(req.query.lat);
+        const lng = Number(req.query.lng);
 
-        if (!lat || !lng || !radius || !type) {
+        // Optional params with safe defaults
+        const radius = Number(req.query.radius ?? 100);
+        const type = req.query.type ?? "restaurant";
+
+        if (!lat || !lng) {
             return res.status(400).json({
-                error: "Missing required query parameters"
+                error: "Missing required query parameters: lat, lng"
             });
         }
 
         const places = await getNearbyPlaces({
-            lat: Number(lat),
-            lng: Number(lng),
-            radius: Number(radius),
+            lat,
+            lng,
+            radius,
             type
         });
 
@@ -44,23 +51,22 @@ app.get("/places", async (req, res) => {
 
     } catch (err) {
         console.error("❌ /places error:", err);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json([]);
     }
 });
 
 /**
  * Directions endpoint
+ *
  * Example:
  * /directions?originLat=33.749&originLng=-84.388&destLat=33.755&destLng=-84.39
  */
 app.get("/directions", async (req, res) => {
     try {
-        const {
-            originLat,
-            originLng,
-            destLat,
-            destLng
-        } = req.query;
+        const originLat = Number(req.query.originLat);
+        const originLng = Number(req.query.originLng);
+        const destLat = Number(req.query.destLat);
+        const destLng = Number(req.query.destLng);
 
         if (
             !originLat || !originLng ||
@@ -72,10 +78,10 @@ app.get("/directions", async (req, res) => {
         }
 
         const result = await getDirectionsDistance({
-            originLat: Number(originLat),
-            originLng: Number(originLng),
-            destLat: Number(destLat),
-            destLng: Number(destLng)
+            originLat,
+            originLng,
+            destLat,
+            destLng
         });
 
         res.json(result);
