@@ -3,7 +3,6 @@ import { redis } from "./redis.js";
 import "dotenv/config";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-
 const CACHE_TTL_SECONDS = 21600; // 6 hours
 const LOCK_TTL_MS = 15000;       // 15 seconds
 const LOCK_WAIT_MS = 200;
@@ -17,113 +16,91 @@ function makeCacheKey(lat, lng, radius, type) {
     return `places:${lat}:${lng}:${radius}:${type}`;
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+async function fetchGeocodingFallback(lat, lng) {
+    const offsets = [
+        [0, 0],
+        [0.0001, 0],
+        [-0.0001, 0],
+        [0, 0.0001],
+        [0, -0.0001],
+        [0.0001, 0.0001],
+        [-0.0001, 0.0001],
+        [0.0001, -0.0001],
+        [-0.0001, -0.0001],
+    ];
 
-async function acquireLock(lockKey) {
-    return await redis.set(lockKey, "1", {
-        NX: true,
-        PX: LOCK_TTL_MS
-    });
+    const client = axios.create();
+    const results = [];
+
+    for (const [latOffset, lngOffset] of offsets) {
+        const rLat = lat + latOffset;
+        const rLng = lng + lngOffset;
+
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${rLat},${rLng}&key=${GOOGLE_API_KEY}`;
+
+        const response = await client.get(url);
+        const body = response.data;
+
+        if (body?.results?.length > 0) {
+            const formattedAddress = body.results[0].formatted_address;
+            results.push({ name: "", address: formattedAddress });
+        }
+
+        if (results.length >= 10) break;
+    }
+
+    return results;
 }
 
 export async function getNearbyPlaces({ lat, lng, radius, type }) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
     const cacheKey = makeCacheKey(rLat, rLng, radius, type);
-    const lockKey = `lock:${cacheKey}`;
 
-    console.log("📍 Request received:", { lat, lng, radius, type });
-    console.log("🔑 Cache key:", cacheKey);
-
-    // 1️⃣ Cache check
+    // 1️⃣ Check cache
     const cached = await redis.get(cacheKey);
-    if (cached) {
-        console.log("✅ CACHE HIT");
-        return JSON.parse(cached);
-    }
+    if (cached) return JSON.parse(cached);
 
-    console.log("❌ CACHE MISS");
-
-    // 2️⃣ Lock attempt
-    const lockAcquired = await acquireLock(lockKey);
-
-    if (!lockAcquired) {
-        console.log("⏳ LOCK HELD — waiting");
-
-        const start = Date.now();
-        while (Date.now() - start < LOCK_MAX_WAIT_MS) {
-            await sleep(LOCK_WAIT_MS);
-            const retry = await redis.get(cacheKey);
-            if (retry) {
-                console.log("🔁 CACHE FILLED BY OTHER REQUEST");
-                return JSON.parse(retry);
-            }
-        }
-
-        throw new Error("Lock timeout waiting for cache fill");
-    }
-
-    console.log("🔒 LOCK ACQUIRED — calling Google");
-
-    // 3️⃣ Google Places call
-    const response = await axios.get(
-        "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-        {
-            params: {
-                location: `${rLat},${rLng}`,
-                radius,
-                type,
-                key: GOOGLE_API_KEY
-            }
-        }
-    );
-
-    const places = response.data.results.map(p => ({
-        place_id: p.place_id,
-        name: p.name,
-        lat: p.geometry.location.lat,
-        lng: p.geometry.location.lng,
-        rating: p.rating ?? null
-    }));
-
-    // 4️⃣ Cache result
-    await redis.setEx(
-        cacheKey,
-        CACHE_TTL_SECONDS,
-        JSON.stringify(places)
-    );
-
-    // 5️⃣ Release lock
-    await redis.del(lockKey);
-
-    console.log("💾 CACHE STORED — lock released");
-
-    return places;
-}
-
-export async function getNearbyPlacesHandler(req, res) {
+    // 2️⃣ Call Google Places Nearby
+    let places = [];
     try {
-        const lat = Number(req.query.lat);
-        const lng = Number(req.query.lng);
-        const radius = Number(req.query.radius ?? 100);
-        const type = req.query.type ?? "restaurant";
+        const response = await axios.get(
+            "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+            {
+                params: {
+                    location: `${rLat},${rLng}`,
+                    radius,
+                    type,
+                    key: GOOGLE_API_KEY
+                }
+            }
+        );
 
-        if (!lat || !lng) {
-            return res.status(400).json({ error: "Missing lat/lng" });
-        }
+        places = response.data.results.map(p => ({
+            name: p.name,
+            address: "", // Nearby Search does not return formatted address
+            lat: p.geometry.location.lat,
+            lng: p.geometry.location.lng,
+            rating: p.rating ?? null
+        }));
+    } catch (err) {
+        console.error("Places API error:", err);
+    }
 
-        const places = await getNearbyPlaces({
+    // 3️⃣ Fallback if no places
+    if (places.length === 0) {
+        console.log("⚠️ Nearby search returned 0 results, falling back to Geocoding");
+        const fallbackResults = await fetchGeocodingFallback(lat, lng);
+        places = fallbackResults.map(p => ({
+            name: p.name,
+            address: p.address,
             lat,
             lng,
-            radius,
-            type
-        });
-
-        res.json(places);
-    } catch (err) {
-        console.error("❌ Nearby places failed:", err);
-        res.status(500).json([]);
+            rating: null
+        }));
     }
+
+    // 4️⃣ Cache and return
+    await redis.setEx(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(places));
+    return places;
 }
