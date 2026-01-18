@@ -77,8 +77,9 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
         );
 
         places = response.data.results.map(p => ({
-            name: p.name,
-            address: "", // Nearby Search does not return formatted address
+            place_id: p.place_id,
+            name: p.name ?? "",
+            address: p.vicinity ?? "", // Nearby Search does not return formatted address
             lat: p.geometry.location.lat,
             lng: p.geometry.location.lng,
             rating: p.rating ?? null
