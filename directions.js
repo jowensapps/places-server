@@ -5,7 +5,7 @@ import "dotenv/config";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
 // Cache + locking config
-const CACHE_TTL_SECONDS = 86400; // 24 hours
+const CACHE_TTL_SECONDS = 2592000; // 30 days (maximum allowed by Google)
 const LOCK_TTL_SECONDS = 10;
 const LOCK_WAIT_MS = 200;
 const LOCK_MAX_WAIT_MS = 5000;
