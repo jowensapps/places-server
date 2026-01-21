@@ -67,7 +67,7 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
     try {
         console.log("🌐 CALLING GOOGLE PLACES NEARBY");
 
-        // Strategy 1: Search with specified type
+        // Strategy 1: Search with specified type and original radius
         let response = await axios.get(
             "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
             {
@@ -82,8 +82,9 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
         );
 
         console.log(`✅ Type search (${type}) returned ${response.data.results?.length || 0} results`);
+        console.log(`📊 API Status: ${response.data.status}`);
 
-        // If type search fails, try without type filter (get everything nearby)
+        // If type search fails, try without type filter
         if (!response.data.results || response.data.results.length === 0) {
             console.log("🔄 Retrying without type filter");
 
@@ -92,7 +93,7 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
                 {
                     params: {
                         location: `${rLat},${rLng}`,
-                        radius: Math.max(radius, 200), // Increase radius to at least 200m
+                        radius: Math.max(radius, 300), // Increase to at least 300m
                         key: GOOGLE_API_KEY
                     },
                     timeout: 10000
@@ -100,6 +101,27 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
             );
 
             console.log(`✅ No-filter search returned ${response.data.results?.length || 0} results`);
+            console.log(`📊 API Status: ${response.data.status}`);
+        }
+
+        // If still no results, try even larger radius
+        if ((!response.data.results || response.data.results.length === 0) && radius < 1000) {
+            console.log("🔄 Retrying with 1000m radius");
+
+            response = await axios.get(
+                "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+                {
+                    params: {
+                        location: `${rLat},${rLng}`,
+                        radius: 1000, // Try 1km
+                        key: GOOGLE_API_KEY
+                    },
+                    timeout: 10000
+                }
+            );
+
+            console.log(`✅ Large radius search returned ${response.data.results?.length || 0} results`);
+            console.log(`📊 API Status: ${response.data.status}`);
         }
 
         if (response.data.results && response.data.results.length > 0) {
@@ -118,7 +140,6 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
             places = resultsToUse.slice(0, 10).map(p => ({
                 place_id: p.place_id,
                 name: p.name ?? "",
-                // Use vicinity for nearby search, it's more reliable than formatted_address
                 address: p.vicinity ?? p.formatted_address ?? "",
                 lat: p.geometry.location.lat,
                 lng: p.geometry.location.lng,
@@ -127,6 +148,9 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
         }
     } catch (err) {
         console.error("❌ Places API error:", err.message);
+        if (err.response) {
+            console.error("❌ Error response:", err.response.data);
+        }
     }
 
     // 3️⃣ Fallback if no places
