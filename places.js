@@ -16,6 +16,22 @@ function makeCacheKey(lat, lng, radius, type) {
     return `places:${lat}:${lng}:${radius}:${type}`;
 }
 
+//** Calculate distance between two points in meters using Haversine formula
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+}
+
 async function fetchGeocodingFallback(lat, lng) {
     const offsets = [
         [0, 0],
@@ -106,14 +122,14 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
 
         // If still no results, try even larger radius
         if ((!response.data.results || response.data.results.length === 0) && radius < 1000) {
-            console.log("🔄 Retrying with 1000m radius");
+            console.log("🔄 Retrying with 500m radius");
 
             response = await axios.get(
                 "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
                 {
                     params: {
                         location: `${rLat},${rLng}`,
-                        radius: 1000, // Try 1km
+                        radius: 500, // Try 500m
                         key: GOOGLE_API_KEY
                     },
                     timeout: 10000
@@ -137,14 +153,36 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
 
             console.log(`🍽️ Using ${resultsToUse.length} results (${foodPlaces.length} food-related)`);
 
-            places = resultsToUse.slice(0, 10).map(p => ({
-                place_id: p.place_id,
-                name: p.name ?? "",
-                address: p.vicinity ?? p.formatted_address ?? "",
-                lat: p.geometry.location.lat,
-                lng: p.geometry.location.lng,
-                rating: p.rating ?? null
-            }));
+            // Map results and calculate distance from user
+            const placesWithDistance = resultsToUse.map(p => {
+                const distance = calculateDistance(
+                    rLat,
+                    rLng,
+                    p.geometry.location.lat,
+                    p.geometry.location.lng
+                );
+
+                return {
+                    place_id: p.place_id,
+                    name: p.name ?? "",
+                    address: p.vicinity ?? p.formatted_address ?? "",
+                    lat: p.geometry.location.lat,
+                    lng: p.geometry.location.lng,
+                    rating: p.rating ?? null,
+                    distance: distance // Store distance for sorting
+                };
+            });
+
+            // Sort by distance (closest first)
+            placesWithDistance.sort((a, b) => a.distance - b.distance);
+
+            console.log(`📏 Closest place: ${placesWithDistance[0]?.name} at ${Math.round(placesWithDistance[0]?.distance)}m`);
+
+            // Take top 10 and remove distance field before returning
+            places = placesWithDistance.slice(0, 10).map(p => {
+                const { distance, ...placeWithoutDistance } = p;
+                return placeWithoutDistance;
+            });
         }
     } catch (err) {
         console.error("❌ Places API error:", err.message);
