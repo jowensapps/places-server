@@ -148,22 +148,42 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
                 p.types?.some(t => foodTypes.includes(t))
             );
 
-            // If no food places, use all results BUT exclude city-only results
+            // If no food places, use all results BUT exclude city-only and administrative results
             let resultsToUse;
             if (foodPlaces.length > 0) {
                 resultsToUse = foodPlaces;
             } else {
-                // Filter out locality/political only results (city, state results)
+                // Filter out results that are just cities/states/administrative areas
                 resultsToUse = response.data.results.filter(p => {
-                    // Exclude if it ONLY has locality/political types
                     const types = p.types || [];
-                    const isOnlyCityState = types.every(t =>
-                        t === 'locality' ||
-                        t === 'political' ||
-                        t === 'administrative_area_level_1' ||
-                        t === 'administrative_area_level_2'
-                    );
-                    return !isOnlyCityState;
+                    const name = p.name || "";
+                    const address = p.vicinity || "";
+
+                    // Exclude if types indicate it's an administrative area
+                    const badTypes = [
+                        'locality',
+                        'political',
+                        'administrative_area_level_1',
+                        'administrative_area_level_2',
+                        'administrative_area_level_3',
+                        'postal_code',
+                        'country',
+                        'neighborhood'
+                    ];
+
+                    // If it ONLY has bad types, exclude it
+                    const hasOnlyBadTypes = types.length > 0 && types.every(t => badTypes.includes(t));
+                    if (hasOnlyBadTypes) {
+                        return false;
+                    }
+
+                    // Also exclude if the name matches the address exactly (usually means it's just a city)
+                    if (name === address) {
+                        return false;
+                    }
+
+                    // Include everything else
+                    return true;
                 });
             }
 
