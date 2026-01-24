@@ -9,7 +9,7 @@ const LOCK_WAIT_MS = 200;
 const LOCK_MAX_WAIT_MS = 5000;
 
 function roundCoord(value) {
-    return Math.floor(value * 10000) / 10000;
+    return Math.floor(value * 1000) / 1000;
 }
 
 function makeCacheKey(lat, lng, radius, type) {
