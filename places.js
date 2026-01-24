@@ -148,8 +148,24 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
                 p.types?.some(t => foodTypes.includes(t))
             );
 
-            // If no food places, use all results
-            const resultsToUse = foodPlaces.length > 0 ? foodPlaces : response.data.results;
+            // If no food places, use all results BUT exclude city-only results
+            let resultsToUse;
+            if (foodPlaces.length > 0) {
+                resultsToUse = foodPlaces;
+            } else {
+                // Filter out locality/political only results (city, state results)
+                resultsToUse = response.data.results.filter(p => {
+                    // Exclude if it ONLY has locality/political types
+                    const types = p.types || [];
+                    const isOnlyCityState = types.every(t =>
+                        t === 'locality' ||
+                        t === 'political' ||
+                        t === 'administrative_area_level_1' ||
+                        t === 'administrative_area_level_2'
+                    );
+                    return !isOnlyCityState;
+                });
+            }
 
             console.log(`🍽️ Using ${resultsToUse.length} results (${foodPlaces.length} food-related)`);
 
