@@ -3,7 +3,7 @@ import { redis } from "./redis.js";
 import "dotenv/config";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const CACHE_TTL_SECONDS = 21600; // 6 hours
+const CACHE_TTL_SECONDS = 2592000; // 30 days
 const LOCK_TTL_MS = 15000;       // 15 seconds
 const LOCK_WAIT_MS = 200;
 const LOCK_MAX_WAIT_MS = 5000;
