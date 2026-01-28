@@ -179,7 +179,7 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
                 // Check if name matches major retailers
                 const name = (p.name || '').toLowerCase();
                 const isMajorRetailer = majorRetailers.some(retailer =>
-                    name.includes(retailer))
+                    name.includes(retailer)
                 );
                 return hasFoodType || isMajorRetailer;
             });
