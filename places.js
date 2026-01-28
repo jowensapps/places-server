@@ -141,12 +141,48 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
         }
 
         if (response.data.results && response.data.results.length > 0) {
-            // Filter to prefer food-related places, but include others if needed
-            const foodTypes = ['restaurant', 'cafe', 'food', 'meal_delivery', 'meal_takeaway', 'bakery', 'bar'];
+            // Filter to prefer food-related places AND major retailers, but include others if needed
+            const foodTypes = [
+                'restaurant',
+                'cafe',
+                'food',
+                'meal_delivery',
+                'meal_takeaway',
+                'bakery',
+                'bar',
+                'supermarket',
+                'grocery_or_supermarket',
+                'store',
+                'shopping_mall',
+                'convenience_store'
+            ];
 
-            let foodPlaces = response.data.results.filter(p =>
-                p.types?.some(t => foodTypes.includes(t))
-            );
+            //Also check by name for major retailers
+            const majorRetailers = [
+                'walmart',
+                'target',
+                'dollar general',
+                'kroger',
+                'publix',
+                'whole foods',
+                'trader joe',
+                'aldi',
+                'costco',
+                'sam\'s club',
+                'cvs',
+                'walgreens'
+            ];
+
+            let foodPlaces = response.data.results.filter(p => {
+                // Check if it has food-related types
+                const hasFoodType = p.types?.some(t => foodTypes.includes(t));
+                // Check if name matches major retailers
+                const name = (p.name || '').toLowerCase();
+                const isMajorRetailer = majorRetailers.some(retailer =>
+                    name.includes(retailer))
+                );
+                return hasFoodType || isMajorRetailer;
+            });
 
             // If no food places, use all results BUT exclude city-only and administrative results
             let resultsToUse;
