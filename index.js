@@ -18,13 +18,20 @@ app.get("/health", (req, res) => {
     res.json({ status: "ok" });
 });
 
+// Add this temporary endpoint for cache clearing - REMOVE AFTER TESTING
+app.get("/clear-cache", async (req, res) => {
+    try {
+        await redis.flushAll();
+        res.json({ success: true, message: "All cache cleared" });
+    } catch (err) {
+        console.error("❌ Cache clear error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 /**
  * Places Nearby endpoint
- *
- * Example:
- * /places?lat=33.749&lng=-84.388
- * /places?lat=33.749&lng=-84.388&radius=500&type=restaurant
- */
+**/
 app.get("/places", async (req, res) => {
     try {
         const lat = Number(req.query.lat);
@@ -89,17 +96,6 @@ app.get("/directions", async (req, res) => {
     } catch (err) {
         console.error("❌ /directions error:", err);
         res.status(500).json({ error: "Internal server error" });
-    }
-});
-
-// Add this temporary endpoint for cache clearing - REMOVE AFTER TESTING
-app.get("/clear-cache", async (req, res) => {
-    try {
-        await redis.flushAll();
-        res.json({ success: true, message: "All cache cleared" });
-    } catch (err) {
-        console.error("❌ Cache clear error:", err);
-        res.status(500).json({ error: err.message });
     }
 });
 
