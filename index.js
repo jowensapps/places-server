@@ -92,6 +92,17 @@ app.get("/directions", async (req, res) => {
     }
 });
 
+// Add this temporary endpoint for cache clearing - REMOVE AFTER TESTING
+app.get("/clear-cache", async (req, res) => {
+    try {
+        await redis.flushAll();
+        res.json({ success: true, message: "All cache cleared" });
+    } catch (err) {
+        console.error("❌ Cache clear error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 /**
  * Start server (Render-compatible)
  */
