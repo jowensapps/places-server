@@ -13,7 +13,7 @@ function roundCoord(value) {
 }
 
 function makeCacheKey(lat, lng, radius, type) {
-    return `places:${lat}:${lng}:${radius}:${type}`;
+    return `places:v2:${lat}:${lng}:${radius}:${type}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula

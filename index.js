@@ -4,7 +4,7 @@ import "dotenv/config";
 
 import { getNearbyPlaces } from "./places.js";
 import { getDirectionsDistance } from "./directions.js";
-import { redis } from "./redis.js"; 
+import "./redis.js"; 
 
 const app = express();
 
@@ -16,17 +16,6 @@ app.use(express.json());
  */
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
-});
-
-// Add this temporary endpoint for cache clearing - REMOVE AFTER TESTING
-app.get("/clear-cache", async (req, res) => {
-    try {
-        await redis.flushAll();
-        res.json({ success: true, message: "All cache cleared" });
-    } catch (err) {
-        console.error("❌ Cache clear error:", err);
-        res.status(500).json({ error: err.message });
-    }
 });
 
 /**
