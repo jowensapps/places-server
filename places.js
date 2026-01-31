@@ -3,7 +3,7 @@ import { redis } from "./redis.js";
 import "dotenv/config";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const CACHE_TTL_SECONDS = 5; // 30 days
+const CACHE_TTL_SECONDS = 2592000; // 30 days
 const LOCK_TTL_MS = 15000;       // 15 seconds
 const LOCK_WAIT_MS = 200;
 const LOCK_MAX_WAIT_MS = 5000;
@@ -13,7 +13,7 @@ function roundCoord(value) {
 }
 
 function makeCacheKey(lat, lng, radius, type) {
-    return `places:v2:${lat}:${lng}:${radius}:${type}`;
+    return `places:${lat}:${lng}:${radius}:${type}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
