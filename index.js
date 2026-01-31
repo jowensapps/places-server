@@ -4,7 +4,7 @@ import "dotenv/config";
 
 import { getNearbyPlaces } from "./places.js";
 import { getDirectionsDistance } from "./directions.js";
-import { redis } from "./redis.js";
+import { redis } from "./redis.js"; 
 
 const app = express();
 
