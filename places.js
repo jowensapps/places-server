@@ -53,8 +53,22 @@ async function fetchGeocodingFallback(lat, lng) {
         const response = await client.get(url);
         const body = response.data;
         if (body?.results?.length > 0) {
-            const formattedAddress = body.results[0].formatted_address;
-            results.push({ name: "", address: formattedAddress });
+            const result = body.results[0];
+            const formattedAddress = result.formatted_address;
+            
+            // Filter out city/state only results
+            // Valid addresses should have a street number or route
+            const hasStreetNumber = result.address_components?.some(component => 
+                component.types.includes('street_number')
+            );
+            const hasRoute = result.address_components?.some(component => 
+                component.types.includes('route')
+            );
+            
+            // Only include if it has an actual street address
+            if (hasStreetNumber || hasRoute) {
+                results.push({ name: "", address: formattedAddress });
+            }
         }
         if (results.length >= 10) break;
     }
