@@ -13,7 +13,7 @@ function roundCoord(value) {
 }
 
 function makeCacheKey(lat, lng, radius) {
-    return `places:v1:${lat}:${lng}:${radius}`;
+    return `places:v0:${lat}:${lng}:${radius}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
@@ -119,8 +119,8 @@ export async function getNearbyPlaces({ lat, lng, radius}) {
             console.log(`📊 API Status: ${response.data.status}`);
         }
 
-        if (response.data.results && response.data.results.length > 0) {
-            // Filter to prefer food-related places AND major retailers, but include others if needed
+            if (response.data.results && response.data.results.length > 0) {
+            // Filter to ONLY food-related places AND major retailers
             const foodTypes = [
                 'restaurant',
                 'cafe',
@@ -136,9 +136,10 @@ export async function getNearbyPlaces({ lat, lng, radius}) {
                 'convenience_store'
             ];
 
-            //Also check by name for major retailers
+            // Check by name for major retailers
             const majorRetailers = [
-                'walmart',
+                'walmart supercenter',
+                'walmart neighborhood market',
                 'target',
                 'dollar general',
                 'kroger',
@@ -148,20 +149,67 @@ export async function getNearbyPlaces({ lat, lng, radius}) {
                 'aldi',
                 'costco',
                 'sam\'s club',
-                'cvs',
+                'cvs pharmacy',
                 'walgreens'
             ];
 
-            let foodPlaces = response.data.results.filter(p => {
+            // STRICT FILTER - only food types OR major retailers
+            let filteredPlaces = response.data.results.filter(p => {
                 // Check if it has food-related types
                 const hasFoodType = p.types?.some(t => foodTypes.includes(t));
-                // Check if name matches major retailers
+                
+                // Check if name matches major retailers (exact match on full name)
                 const name = (p.name || '').toLowerCase();
                 const isMajorRetailer = majorRetailers.some(retailer =>
-                    name.includes(retailer)
+                    name === retailer || name.startsWith(retailer)
                 );
+                
                 return hasFoodType || isMajorRetailer;
             });
+
+            console.log(`🍽️ Filtered to ${filteredPlaces.length} food/retail places from ${response.data.results.length} total`);
+
+            // If filter is too strict and returns nothing, fall back to food types only
+            if (filteredPlaces.length === 0) {
+                console.log("⚠️ Strict filter too restrictive, using food types only");
+                filteredPlaces = response.data.results.filter(p => {
+                    return p.types?.some(t => foodTypes.includes(t));
+                });
+            }
+
+            // Map results and calculate distance from user
+            const placesWithDistance = filteredPlaces.map(p => {
+                const distance = calculateDistance(
+                    rLat,
+                    rLng,
+                    p.geometry.location.lat,
+                    p.geometry.location.lng
+                );
+
+                return {
+                    place_id: p.place_id,
+                    name: p.name ?? "",
+                    address: p.vicinity ?? p.formatted_address ?? "",
+                    lat: p.geometry.location.lat,
+                    lng: p.geometry.location.lng,
+                    rating: p.rating ?? null,
+                    distance: distance
+                };
+            });
+
+            // Sort by distance (closest first)
+            placesWithDistance.sort((a, b) => a.distance - b.distance);
+
+            if (placesWithDistance.length > 0) {
+                console.log(`📏 Closest place: ${placesWithDistance[0]?.name} at ${Math.round(placesWithDistance[0]?.distance)}m`);
+            }
+
+            // Take top 10 and remove distance field before returning
+            places = placesWithDistance.slice(0, 10).map(p => {
+                const { distance, ...placeWithoutDistance } = p;
+                return placeWithoutDistance;
+            });
+        }
 
             // If no food places, use all results BUT exclude city-only and administrative results
             let resultsToUse;
