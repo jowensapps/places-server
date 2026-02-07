@@ -12,8 +12,8 @@ function roundCoord(value) {
     return Math.floor(value * 1000) / 1000;
 }
 
-function makeCacheKey(lat, lng, radius, type) {
-    return `places:v3:${lat}:${lng}:${radius}:${type}`;
+function makeCacheKey(lat, lng, radius) {
+    return `places:v3:${lat}:${lng}:${radius}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
@@ -61,12 +61,12 @@ async function fetchGeocodingFallback(lat, lng) {
     return results;
 }
 
-export async function getNearbyPlaces({ lat, lng, radius, type }) {
+export async function getNearbyPlaces({ lat, lng, radius}) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
-    const cacheKey = makeCacheKey(rLat, rLng, radius, type);
+    const cacheKey = makeCacheKey(rLat, rLng, radius);
 
-    console.log("📍 Places request:", { rLat, rLng, radius, type });
+    console.log("📍 Places request:", { rLat, rLng, radius});
 
     // 1️⃣ Check cache
     const cached = await redis.get(cacheKey);
@@ -83,42 +83,21 @@ export async function getNearbyPlaces({ lat, lng, radius, type }) {
     try {
         console.log("🌐 CALLING GOOGLE PLACES NEARBY");
 
-        // Strategy 1: Search with specified type and original radius
+        // Strategy 1: Search 200m
         let response = await axios.get(
             "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
             {
                 params: {
                     location: `${rLat},${rLng}`,
                     radius,
-                    type,
                     key: GOOGLE_API_KEY
                 },
                 timeout: 10000
             }
         );
 
-        console.log(`✅ Type search (${type}) returned ${response.data.results?.length || 0} results`);
+        console.log(`✅ Search returned ${response.data.results?.length || 0} results`);
         console.log(`📊 API Status: ${response.data.status}`);
-
-        // If type search fails, try without type filter
-        if (!response.data.results || response.data.results.length === 0) {
-            console.log("🔄 Retrying without type filter");
-
-            response = await axios.get(
-                "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-                {
-                    params: {
-                        location: `${rLat},${rLng}`,
-                        radius: Math.max(radius, 300), // Increase to at least 300m
-                        key: GOOGLE_API_KEY
-                    },
-                    timeout: 10000
-                }
-            );
-
-            console.log(`✅ No-filter search returned ${response.data.results?.length || 0} results`);
-            console.log(`📊 API Status: ${response.data.status}`);
-        }
 
         // If still no results, try even larger radius
         if ((!response.data.results || response.data.results.length === 0) && radius < 1000) {
