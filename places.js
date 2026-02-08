@@ -53,22 +53,8 @@ async function fetchGeocodingFallback(lat, lng) {
         const response = await client.get(url);
         const body = response.data;
         if (body?.results?.length > 0) {
-            const result = body.results[0];
-            const formattedAddress = result.formatted_address;
-            
-            // Filter out city/state only results
-            // Valid addresses should have a street number or route
-            const hasStreetNumber = result.address_components?.some(component => 
-                component.types.includes('street_number')
-            );
-            const hasRoute = result.address_components?.some(component => 
-                component.types.includes('route')
-            );
-            
-            // Only include if it has an actual street address
-            if (hasStreetNumber || hasRoute) {
-                results.push({ name: "", address: formattedAddress });
-            }
+            const formattedAddress = body.results[0].formatted_address;
+            results.push({ name: "", address: formattedAddress });
         }
         if (results.length >= 10) break;
     }
@@ -91,13 +77,58 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
 
     console.log("❌ CACHE MISS");
 
-    // 2️⃣ Try multiple search strategies
+    // 2️⃣ Search and filter
     let places = [];
 
     try {
         console.log("🌐 CALLING GOOGLE PLACES NEARBY");
 
-        // Strategy 1: Broad search (no type filter)
+        // Food types for filtering
+        const foodTypes = [
+            'restaurant',
+            'cafe',
+            'food',
+            'meal_delivery',
+            'meal_takeaway',
+            'bakery',
+            'bar',
+            'supermarket',
+            'grocery_or_supermarket',
+            'store',
+            'shopping_mall',
+            'convenience_store'
+        ];
+
+        // Major retailers for filtering
+        const majorRetailers = [
+            'walmart supercenter',
+            'walmart neighborhood market',
+            'target',
+            'dollar general',
+            'kroger',
+            'publix',
+            'whole foods',
+            'trader joe',
+            'aldi',
+            'costco',
+            'sam\'s club',
+            'cvs pharmacy',
+            'walgreens'
+        ];
+
+        // Helper function to filter results
+        const filterPlaces = (results) => {
+            return results.filter(p => {
+                const hasFoodType = p.types?.some(t => foodTypes.includes(t));
+                const name = (p.name || '').toLowerCase();
+                const isMajorRetailer = majorRetailers.some(retailer =>
+                    name === retailer || name.startsWith(retailer)
+                );
+                return hasFoodType || isMajorRetailer;
+            });
+        };
+
+        // Initial search with provided radius (200m from Android)
         let response = await axios.get(
             "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
             {
@@ -110,12 +141,19 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
             }
         );
 
-        console.log(`✅ Search returned ${response.data.results?.length || 0} results`);
+        console.log(`✅ ${radius}m search returned ${response.data.results?.length || 0} results`);
         console.log(`📊 API Status: ${response.data.status}`);
 
-        // If no results, try larger radius
-        if ((!response.data.results || response.data.results.length === 0) && radius < 1000) {
-            console.log("🔄 Retrying with 500m radius");
+        let filteredPlaces = [];
+        
+        if (response.data.results && response.data.results.length > 0) {
+            filteredPlaces = filterPlaces(response.data.results);
+            console.log(`🍽️ Filtered to ${filteredPlaces.length} food/retail places from ${response.data.results.length} total`);
+        }
+
+        // If no food/retail places found and radius < 500m, expand search
+        if (filteredPlaces.length === 0 && radius < 500) {
+            console.log("🔄 No food/retail places in 200m, expanding to 500m");
 
             response = await axios.get(
                 "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
@@ -129,69 +167,17 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
                 }
             );
 
-            console.log(`✅ Large radius search returned ${response.data.results?.length || 0} results`);
+            console.log(`✅ 500m search returned ${response.data.results?.length || 0} results`);
             console.log(`📊 API Status: ${response.data.status}`);
+
+            if (response.data.results && response.data.results.length > 0) {
+                filteredPlaces = filterPlaces(response.data.results);
+                console.log(`🍽️ Filtered to ${filteredPlaces.length} food/retail places from ${response.data.results.length} total`);
+            }
         }
 
-        if (response.data.results && response.data.results.length > 0) {
-            // Filter to ONLY food-related places AND major retailers
-            const foodTypes = [
-                'restaurant',
-                'cafe',
-                'food',
-                'meal_delivery',
-                'meal_takeaway',
-                'bakery',
-                'bar',
-                'supermarket',
-                'grocery_or_supermarket',
-                'store',
-                'shopping_mall',
-                'convenience_store'
-            ];
-
-            // Check by name for major retailers
-            const majorRetailers = [
-                'walmart supercenter',
-                'walmart neighborhood market',
-                'target',
-                'dollar general',
-                'kroger',
-                'publix',
-                'whole foods',
-                'trader joe',
-                'aldi',
-                'costco',
-                'sam\'s club',
-                'cvs pharmacy',
-                'walgreens'
-            ];
-
-            // STRICT FILTER - only food types OR major retailers
-            let filteredPlaces = response.data.results.filter(p => {
-                // Check if it has food-related types
-                const hasFoodType = p.types?.some(t => foodTypes.includes(t));
-
-                // Check if name matches major retailers (exact match on full name)
-                const name = (p.name || '').toLowerCase();
-                const isMajorRetailer = majorRetailers.some(retailer =>
-                    name === retailer || name.startsWith(retailer)
-                );
-
-                return hasFoodType || isMajorRetailer;
-            });
-
-            console.log(`🍽️ Filtered to ${filteredPlaces.length} food/retail places from ${response.data.results.length} total`);
-
-            // If filter is too strict and returns nothing, fall back to food types only
-            if (filteredPlaces.length === 0) {
-                console.log("⚠️ Strict filter too restrictive, using food types only");
-                filteredPlaces = response.data.results.filter(p => {
-                    return p.types?.some(t => foodTypes.includes(t));
-                });
-            }
-
-            // Map results and calculate distance from user
+        // If we have filtered results, sort by distance and return
+        if (filteredPlaces.length > 0) {
             const placesWithDistance = filteredPlaces.map(p => {
                 const distance = calculateDistance(
                     rLat,
@@ -214,12 +200,10 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
             // Sort by distance (closest first)
             placesWithDistance.sort((a, b) => a.distance - b.distance);
 
-            if (placesWithDistance.length > 0) {
-                console.log(`📏 Closest place: ${placesWithDistance[0]?.name} at ${Math.round(placesWithDistance[0]?.distance)}m`);
-            }
+            console.log(`📏 Closest place: ${placesWithDistance[0]?.name} at ${Math.round(placesWithDistance[0]?.distance)}m`);
 
-            // Take top 15 and remove distance field before returning
-            places = placesWithDistance.slice(0, 15).map(p => {
+            // Take top 10 and remove distance field before returning
+            places = placesWithDistance.slice(0, 10).map(p => {
                 const { distance, ...placeWithoutDistance } = p;
                 return placeWithoutDistance;
             });
