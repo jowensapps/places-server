@@ -141,7 +141,7 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
             }
         );
 
-        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results`); || 0} results`);
+        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results`);
         console.log(`📊 API Status: ${response.data.status}`);
 
         let filteredPlaces = [];
