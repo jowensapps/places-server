@@ -128,20 +128,20 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
             });
         };
 
-        // Initial search with provided radius (200m from Android)
-        let response = await axios.get(
+            // Initial search with 100m radius (ignore radius from Android)
+            let response = await axios.get(
             "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
             {
                 params: {
                     location: `${rLat},${rLng}`,
-                    radius,
+                    radius: 100,  // CHANGED from radius to 100
                     key: GOOGLE_API_KEY
                 },
                 timeout: 10000
             }
         );
 
-        console.log(`✅ ${radius}m search returned ${response.data.results?.length || 0} results`);
+        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results`); || 0} results`);
         console.log(`📊 API Status: ${response.data.status}`);
 
         let filteredPlaces = [];
@@ -151,23 +151,23 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
             console.log(`🍽️ Filtered to ${filteredPlaces.length} food/retail places from ${response.data.results.length} total`);
         }
 
-        // If no food/retail places found and radius < 500m, expand search
-        if (filteredPlaces.length === 0 && radius < 500) {
-            console.log("🔄 No food/retail places in 200m, expanding to 500m");
+        // If no food/retail places found, expand to 200m
+        if (filteredPlaces.length === 0) {
+            console.log("🔄 No food/retail places in 100m, expanding to 200m");
 
             response = await axios.get(
                 "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
                 {
                     params: {
                         location: `${rLat},${rLng}`,
-                        radius: 500,
+                        radius: 200,  // CHANGED from 500 to 200
                         key: GOOGLE_API_KEY
                     },
                     timeout: 10000
                 }
             );
 
-            console.log(`✅ 500m search returned ${response.data.results?.length || 0} results`);
+            console.log(`✅ 200m search returned ${response.data.results?.length || 0} results`);
             console.log(`📊 API Status: ${response.data.status}`);
 
             if (response.data.results && response.data.results.length > 0) {
