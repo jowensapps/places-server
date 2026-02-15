@@ -113,14 +113,30 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
             'aldi',
             'costco',
             'sam\'s club',
-            'cvs pharmacy',
+            'cvs',
             'walgreens'
         ];
-
+        
+        // Blacklisted keywords - exclude any place containing these words
+        const blacklistKeywords = [
+            'pharmacy',
+            'auto care',
+            'vision center',
+            'tire center',
+            'optical'
+        ];
+                
         // Helper function to filter results based on mode
         const filterPlaces = (results) => {
             return results.filter(p => {
                 const name = (p.name || '').toLowerCase();
+                
+                // Check if name contains any blacklisted keywords
+                const isBlacklisted = blacklistKeywords.some(keyword =>
+                    name.includes(keyword)
+                );
+                if (isBlacklisted) return false;
+                
                 const isMajorRetailer = majorRetailers.some(retailer =>
                     name === retailer || name.startsWith(retailer)
                 );
