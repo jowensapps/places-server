@@ -23,31 +23,25 @@ app.get("/health", (req, res) => {
 **/
 app.get("/places", async (req, res) => {
     try {
-        const lat = Number(req.query.lat);
-        const lng = Number(req.query.lng);
-
-        // Optional params with safe defaults
-        const radius = Number(req.query.radius ?? 100);
-        const type = req.query.type ?? "restaurant";
+        const { lat, lng, radius, groceryMode } = req.query;  // ADD groceryMode
 
         if (!lat || !lng) {
-            return res.status(400).json({
-                error: "Missing required query parameters: lat, lng"
-            });
+            return res.status(400).json({ error: "Missing lat/lng" });
         }
 
+        const r = radius ? parseInt(radius, 10) : 200;
+
         const places = await getNearbyPlaces({
-            lat,
-            lng,
-            radius,
-            type
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            radius: r,
+            groceryMode: groceryMode  // PASS IT THROUGH
         });
 
         res.json(places);
-
     } catch (err) {
-        console.error("❌ /places error:", err);
-        res.status(500).json([]);
+        console.error("❌ Places endpoint error:", err);
+        res.status(500).json({ error: err.message });
     }
 });
 
