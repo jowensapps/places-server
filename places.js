@@ -166,7 +166,7 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
         );
 
         const modeLabel = (groceryMode === 'true' || groceryMode === true) ? 'GROCERY' : 'NORMAL';
-        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results (${modeLabel} mode)`);
+        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results`);
         console.log(`📊 API Status: ${response.data.status}`);
 
         let filteredPlaces = [];
