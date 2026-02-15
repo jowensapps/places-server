@@ -14,7 +14,7 @@ function roundCoord(value) {
 
 function makeCacheKey(lat, lng, radius, groceryMode) {
     const mode = groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v4:${lat}:${lng}:${radius}:${mode}`;
+    return `places:v5:${lat}:${lng}:${radius}:${mode}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
@@ -62,12 +62,12 @@ async function fetchGeocodingFallback(lat, lng) {
     return results;
 }
 
-export async function getNearbyPlaces({ lat, lng, radius }) {
+export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
-    const cacheKey = makeCacheKey(rLat, rLng, radius);
+    const cacheKey = makeCacheKey(rLat, rLng, radius, groceryMode);
 
-    console.log("📍 Places request:", { rLat, rLng, radius });
+    console.log("📍 Places request:", { rLat, rLng, radius, groceryMode });
 
     // 1️⃣ Check cache
     const cached = await redis.get(cacheKey);
@@ -80,99 +80,6 @@ export async function getNearbyPlaces({ lat, lng, radius }) {
 
     // 2️⃣ Search and filter
     let places = [];
-
-    try {
-        console.log("🌐 CALLING GOOGLE PLACES NEARBY");
-
-        // Food types for filtering
-        const foodTypes = [
-            'restaurant',
-            'cafe',
-            'food',
-            'meal_delivery',
-            'meal_takeaway',
-            'bakery',
-            'bar',
-            'supermarket',
-            'grocery_or_supermarket',
-            'store',
-            'shopping_mall',
-            'convenience_store'
-        ];
-
-        // Major retailers for filtering
-        const majorRetailers = [
-            'walmart supercenter',
-            'walmart neighborhood market',
-            'target',
-            'dollar general',
-            'kroger',
-            'publix',
-            'whole foods',
-            'trader joe',
-            'aldi',
-            'costco',
-            'sam\'s club',
-            'cvs pharmacy',
-            'walgreens'
-        ];
-
-        // Helper function to filter results
-        const filterPlaces = (results) => {
-            return results.filter(p => {
-                const hasFoodType = p.types?.some(t => foodTypes.includes(t));
-                const name = (p.name || '').toLowerCase();
-                const isMajorRetailer = majorRetailers.some(retailer =>
-                    name === retailer || name.startsWith(retailer)
-                );
-                return hasFoodType || isMajorRetailer;
-            });
-        };
-
-            // Initial search with 100m radius (ignore radius from Android)
-            let response = await axios.get(
-            "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-            {
-                params: {
-                    location: `${rLat},${rLng}`,
-                    radius: 100,  // CHANGED from radius to 100
-                    key: GOOGLE_API_KEY
-                },
-                timeout: 10000
-            }
-        );
-
-        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results`);
-        console.log(`📊 API Status: ${response.data.status}`);
-
-        let filteredPlaces = [];
-        
-        if (response.data.results && response.data.results.length > 0) {
-            filteredPlaces = filterPlaces(response.data.results);
-            console.log(`🍽️ Filtered to ${filteredPlaces.length} food/retail places from ${response.data.results.length} total`);
-        }
-
-        // If no food/retail places found, expand to 200m
-        if (filteredPlaces.length === 0) {
-            console.log("🔄 No food/retail places in 100m, expanding to 200m");
-
-            response = await axios.get(
-                "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-                {
-                    params: {
-                        location: `${rLat},${rLng}`,
-                        radius: 200,  // CHANGED from 500 to 200
-                        key: GOOGLE_API_KEY
-// Update places.js - Modify getNearbyPlaces function signature and filtering
-
-export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {  // ADD groceryMode
-    const rLat = roundCoord(lat);
-    const rLng = roundCoord(lng);
-    const cacheKey = makeCacheKey(rLat, rLng, radius, groceryMode);  // Include in cache key
-
-    console.log("📍 Places request:", { rLat, rLng, radius, groceryMode });
-
-    // ... cache check code ...
 
     try {
         console.log("🌐 CALLING GOOGLE PLACES NEARBY");
