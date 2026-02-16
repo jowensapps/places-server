@@ -176,16 +176,16 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
             console.log(`🍽️ Filtered to ${filteredPlaces.length} places from ${response.data.results.length} total`);
         }
 
-        // If no places found, expand search to 200m
+        // If no places found, expand search to 500m
         if (filteredPlaces.length === 0) {
-            console.log("🔄 No places in 100m, expanding to 200m");
+            console.log("🔄 No places in 100m, expanding to 500m");
 
             response = await axios.get(
                 "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
                 {
                     params: {
                         location: `${rLat},${rLng}`,
-                        radius: 200,
+                        radius: 500,
                         key: GOOGLE_API_KEY
                     },
                     timeout: 10000
