@@ -14,7 +14,7 @@ function roundCoord(value) {
 
 function makeCacheKey(lat, lng, radius, groceryMode) {
     const mode = groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v5:${lat}:${lng}:${radius}:${mode}`;
+    return `places:v6:${lat}:${lng}:${radius}:${mode}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
