@@ -192,7 +192,7 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
                 }
             );
 
-            console.log(`✅ 200m search returned ${response.data.results?.length || 0} results`);
+            console.log(`✅ 500m search returned ${response.data.results?.length || 0} results`);
             console.log(`📊 API Status: ${response.data.status}`);
 
             if (response.data.results && response.data.results.length > 0) {
