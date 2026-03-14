@@ -12,8 +12,9 @@ function roundCoord(value) {
     return Math.floor(value * 1000) / 1000;
 }
 
-function makeCacheKey(lat, lng, radius, groceryMode) {
-    const mode = groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
+function makeCacheKey(lat, lng, radius, groceryMode, allPlaces) {
+    const mode = allPlaces === 'true' || allPlaces === true ? 'all'
+        : groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
     return `places:v6:${lat}:${lng}:${radius}:${mode}`;
 }
 
@@ -62,7 +63,7 @@ async function fetchGeocodingFallback(lat, lng) {
     return results;
 }
 
-export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
+export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces }) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
     const cacheKey = makeCacheKey(rLat, rLng, radius, groceryMode);
@@ -116,6 +117,11 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
             'cvs',
             'walgreens'
         ];
+
+        // All places mode 
+        if (allPlaces === 'true' || allPlaces === true) {
+            return true; // include everything 
+        }
         
         // Blacklisted keywords - exclude any place containing these words
         const blacklistKeywords = [
@@ -130,6 +136,11 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode }) {
         const filterPlaces = (results) => {
             return results.filter(p => {
                 const name = (p.name || '').toLowerCase();
+
+                // All places mode: skip filtering, return all named places
+                if (allPlaces === 'true' || allPlaces === true) {
+                    return name.length > 0;
+                }
                 
                 // Check if name contains any blacklisted keywords
                 const isBlacklisted = blacklistKeywords.some(keyword =>
