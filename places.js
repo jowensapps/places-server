@@ -66,7 +66,7 @@ async function fetchGeocodingFallback(lat, lng) {
 export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces }) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
-    const cacheKey = makeCacheKey(rLat, rLng, radius, groceryMode);
+    const cacheKey = makeCacheKey(rLat, rLng, radius, groceryMode, allPlaces);
 
     console.log("📍 Places request:", { rLat, rLng, radius, groceryMode });
 
@@ -117,11 +117,6 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces
             'cvs',
             'walgreens'
         ];
-
-        // All places mode 
-        if (allPlaces === 'true' || allPlaces === true) {
-            return true; // include everything 
-        }
         
         // Blacklisted keywords - exclude any place containing these words
         const blacklistKeywords = [
