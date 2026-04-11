@@ -4,12 +4,14 @@ import "dotenv/config";
 
 import { getNearbyPlaces } from "./places.js";
 import { getDirectionsDistance } from "./directions.js";
-import "./redis.js"; 
+import "./redis.js";
+import debugSync from "./debug-sync.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(debugSync);
 
 /**
  * Health check (used by UptimeRobot)
