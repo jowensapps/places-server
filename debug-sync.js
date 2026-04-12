@@ -2,7 +2,7 @@ import { Router } from "express";
 
 const router = Router();
 
-const DEBUG_TOKEN = "pick-a-random-string-here"; // something only you and your wife's app know
+const DEBUG_TOKEN = "24b99271dfd4327a852030658814d21a9c37fcc028ebfae7b0765a72510125cc";
 
 let storedPayload = null;
 
