@@ -2,7 +2,7 @@ import { Router } from "express";
 
 const router = Router();
 
-const DEBUG_TOKEN = "24b99271dfd4327a852030658814d21a9c37fcc028ebfae7b0765a72510125cc";
+const DEBUG_TOKEN = "debug-db-data-download";
 
 let storedPayload = null;
 
