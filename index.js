@@ -1,17 +1,15 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import "dotenv/config";
 
 import { getNearbyPlaces } from "./places.js";
 import { getDirectionsDistance } from "./directions.js";
-import "./redis.js";
-import debugSync from "./debug-sync.js";
+import "./redis.js"; 
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(debugSync);
 
 /**
  * Health check (used by UptimeRobot)
@@ -25,7 +23,7 @@ app.get("/health", (req, res) => {
 **/
 app.get("/places", async (req, res) => {
     try {
-        const { lat, lng, radius, groceryMode, allPlaces } = req.query;  // ADD groceryMode
+        const { lat, lng, radius, groceryMode, allPlaces } = req.query;
 
         if (!lat || !lng) {
             return res.status(400).json({ error: "Missing lat/lng" });
@@ -37,7 +35,7 @@ app.get("/places", async (req, res) => {
             lat: parseFloat(lat),
             lng: parseFloat(lng),
             radius: r,
-            groceryMode: groceryMode,  // PASS IT THROUGH
+            groceryMode: groceryMode,
             allPlaces: allPlaces
         });
 
