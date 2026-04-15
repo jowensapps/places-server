@@ -15,7 +15,7 @@ function roundCoord(value) {
 function makeCacheKey(lat, lng, radius, groceryMode, allPlaces) {
     const mode = allPlaces === 'true' || allPlaces === true ? 'all'
         : groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v7:${lat}:${lng}:${radius}:${mode}`;
+    return `places:v8:${lat}:${lng}:${radius}:${mode}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
@@ -63,6 +63,38 @@ async function fetchGeocodingFallback(lat, lng) {
     return results;
 }
 
+/**
+ * Call the Places (New) API searchNearby endpoint.
+ * Returns the raw `places` array from the response.
+ */
+async function searchNearby(lat, lng, radiusMeters) {
+    const response = await axios.post(
+        "https://places.googleapis.com/v1/places:searchNearby",
+        {
+            maxResultCount: 20,
+            locationRestriction: {
+                circle: {
+                    center: {
+                        latitude: lat,
+                        longitude: lng
+                    },
+                    radius: radiusMeters
+                }
+            }
+        },
+        {
+            headers: {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": GOOGLE_API_KEY,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.rating,places.types"
+            },
+            timeout: 10000
+        }
+    );
+
+    return response.data.places || [];
+}
+
 export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces }) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
@@ -83,23 +115,7 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces
     let places = [];
 
     try {
-        console.log("🌐 CALLING GOOGLE PLACES NEARBY");
-
-        // Food types for filtering (only used in non-grocery mode)
-        const foodTypes = [
-            'restaurant',
-            'cafe',
-            'food',
-            'meal_delivery',
-            'meal_takeaway',
-            'bakery',
-            'bar',
-            'supermarket',
-            'grocery_or_supermarket',
-            'store',
-            'shopping_mall',
-            'convenience_store'
-        ];
+        console.log("🌐 CALLING GOOGLE PLACES (NEW) NEARBY");
 
         // Major retailers for filtering
         const majorRetailers = [
@@ -117,7 +133,7 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces
             'cvs',
             'walgreens'
         ];
-        
+
         // Blacklisted keywords - exclude any place containing these words
         const blacklistKeywords = [
             'pharmacy',
@@ -126,23 +142,38 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces
             'tire center',
             'optical'
         ];
-                
+
+        // Food types for filtering (New API type names)
+        const foodTypes = [
+            'restaurant',
+            'cafe',
+            'bakery',
+            'bar',
+            'meal_delivery',
+            'meal_takeaway',
+            'supermarket',
+            'grocery_store',         // was grocery_or_supermarket
+            'store',
+            'shopping_mall',
+            'convenience_store'
+        ];
+
         // Helper function to filter results based on mode
         const filterPlaces = (results) => {
             return results.filter(p => {
-                const name = (p.name || '').toLowerCase();
+                const name = (p.displayName?.text || '').toLowerCase();
 
                 // All places mode: skip filtering, return all named places
                 if (allPlaces === 'true' || allPlaces === true) {
                     return name.length > 0;
                 }
-                
+
                 // Check if name contains any blacklisted keywords
                 const isBlacklisted = blacklistKeywords.some(keyword =>
                     name.includes(keyword)
                 );
                 if (isBlacklisted) return false;
-                
+
                 const isMajorRetailer = majorRetailers.some(retailer =>
                     name === retailer || name.startsWith(retailer)
                 );
@@ -159,51 +190,29 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces
         };
 
         // Initial search with 100m radius
-        let response = await axios.get(
-            "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-            {
-                params: {
-                    location: `${rLat},${rLng}`,
-                    radius: 100,
-                    key: GOOGLE_API_KEY
-                },
-                timeout: 10000
-            }
-        );
+        let rawPlaces = await searchNearby(rLat, rLng, 100.0);
 
         const modeLabel = (groceryMode === 'true' || groceryMode === true) ? 'GROCERY' : 'NORMAL';
-        console.log(`✅ 100m search returned ${response.data.results?.length || 0} results`);
-        console.log(`📊 API Status: ${response.data.status}`);
+        console.log(`✅ 100m search returned ${rawPlaces.length} results`);
 
         let filteredPlaces = [];
-        
-        if (response.data.results && response.data.results.length > 0) {
-            filteredPlaces = filterPlaces(response.data.results);
-            console.log(`🍽️ Filtered to ${filteredPlaces.length} places from ${response.data.results.length} total`);
+
+        if (rawPlaces.length > 0) {
+            filteredPlaces = filterPlaces(rawPlaces);
+            console.log(`🍽️ Filtered to ${filteredPlaces.length} places from ${rawPlaces.length} total`);
         }
 
         // If no places found, expand search to 500m
         if (filteredPlaces.length === 0) {
             console.log("🔄 No places in 100m, expanding to 500m");
 
-            response = await axios.get(
-                "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-                {
-                    params: {
-                        location: `${rLat},${rLng}`,
-                        radius: 500,
-                        key: GOOGLE_API_KEY
-                    },
-                    timeout: 10000
-                }
-            );
+            rawPlaces = await searchNearby(rLat, rLng, 500.0);
 
-            console.log(`✅ 500m search returned ${response.data.results?.length || 0} results`);
-            console.log(`📊 API Status: ${response.data.status}`);
+            console.log(`✅ 500m search returned ${rawPlaces.length} results`);
 
-            if (response.data.results && response.data.results.length > 0) {
-                filteredPlaces = filterPlaces(response.data.results);
-                console.log(`🍽️ Filtered to ${filteredPlaces.length} places from ${response.data.results.length} total`);
+            if (rawPlaces.length > 0) {
+                filteredPlaces = filterPlaces(rawPlaces);
+                console.log(`🍽️ Filtered to ${filteredPlaces.length} places from ${rawPlaces.length} total`);
             }
         }
 
@@ -213,32 +222,30 @@ export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces
                 const distance = calculateDistance(
                     rLat,
                     rLng,
-                    p.geometry.location.lat,
-                    p.geometry.location.lng
+                    p.location.latitude,
+                    p.location.longitude
                 );
 
+                const nameLower = (p.displayName?.text || '').toLowerCase();
+
                 return {
-                    place_id: p.place_id,
-                    name: p.name ?? "",
-                    address: p.vicinity ?? p.formatted_address ?? "",
-                    lat: p.geometry.location.lat,
-                    lng: p.geometry.location.lng,
+                    place_id: p.id,
+                    name: p.displayName?.text ?? "",
+                    address: p.shortFormattedAddress ?? p.formattedAddress ?? "",
+                    lat: p.location.latitude,
+                    lng: p.location.longitude,
                     rating: p.rating ?? null,
                     distance: distance,
-                    isMajorRetailer: majorRetailers.some(r => 
-                        (p.name || '').toLowerCase() === r || 
-                        (p.name || '').toLowerCase().startsWith(r)
+                    isMajorRetailer: majorRetailers.some(r =>
+                        nameLower === r || nameLower.startsWith(r)
                     )
                 };
             });
 
             // Sort: Major retailers first, then by distance
             placesWithDistance.sort((a, b) => {
-                // Major retailers come first
                 if (a.isMajorRetailer && !b.isMajorRetailer) return -1;
                 if (!a.isMajorRetailer && b.isMajorRetailer) return 1;
-                
-                // Otherwise sort by distance
                 return a.distance - b.distance;
             });
 
