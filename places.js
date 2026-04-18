@@ -86,7 +86,7 @@ async function searchNearby(lat, lng, radiusMeters) {
             headers: {
                 "Content-Type": "application/json",
                 "X-Goog-Api-Key": GOOGLE_API_KEY,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.rating,places.types"
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.types"
             },
             timeout: 10000
         }
