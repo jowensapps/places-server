@@ -25,20 +25,16 @@ app.get("/health", (req, res) => {
 **/
 app.get("/places", async (req, res) => {
     try {
-        const { lat, lng, radius, groceryMode, allPlaces } = req.query;
+        const { lat, lng, groceryMode } = req.query;
 
         if (!lat || !lng) {
             return res.status(400).json({ error: "Missing lat/lng" });
         }
 
-        const r = radius ? parseInt(radius, 10) : 200;
-
         const places = await getNearbyPlaces({
             lat: parseFloat(lat),
             lng: parseFloat(lng),
-            radius: r,
-            groceryMode: groceryMode,
-            allPlaces: allPlaces
+            groceryMode: groceryMode
         });
 
         res.json(places);
