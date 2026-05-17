@@ -15,7 +15,7 @@ function roundCoord(value) {
 function makeCacheKey(lat, lng, radius, groceryMode, allPlaces) {
     const mode = allPlaces === 'true' || allPlaces === true ? 'all'
         : groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v8:${lat}:${lng}:${radius}:${mode}`;
+    return `places:v9:${lat}:${lng}:${mode}`;
 }
 
 //** Calculate distance between two points in meters using Haversine formula
@@ -95,12 +95,12 @@ async function searchNearby(lat, lng, radiusMeters) {
     return response.data.places || [];
 }
 
-export async function getNearbyPlaces({ lat, lng, radius, groceryMode, allPlaces }) {
+export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
     const rLat = roundCoord(lat);
     const rLng = roundCoord(lng);
-    const cacheKey = makeCacheKey(rLat, rLng, radius, groceryMode, allPlaces);
+    const cacheKey = makeCacheKey(rLat, rLng, groceryMode, allPlaces);
 
-    console.log("📍 Places request:", { rLat, rLng, radius, groceryMode });
+    console.log("📍 Places request:", { rLat, rLng, groceryMode });
 
     // 1️⃣ Check cache
     const cached = await redis.get(cacheKey);
