@@ -4,23 +4,20 @@ import "dotenv/config";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const CACHE_TTL_SECONDS = 2592000; // 30 days
-const LOCK_TTL_MS = 15000;       // 15 seconds
-const LOCK_WAIT_MS = 200;
-const LOCK_MAX_WAIT_MS = 5000;
 
 function roundCoord(value) {
     return Math.floor(value * 1000) / 1000;
 }
 
-function makeCacheKey(lat, lng, radius, groceryMode, allPlaces) {
+function makeCacheKey(lat, lng, groceryMode, allPlaces) {
     const mode = allPlaces === 'true' || allPlaces === true ? 'all'
         : groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v9:${lat}:${lng}:${mode}`;
+    return `places:v10:${lat}:${lng}:${mode}`;
 }
 
-//** Calculate distance between two points in meters using Haversine formula
+/** Calculate distance between two points in meters using Haversine formula */
 function calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371e3; // Earth's radius in meters
+    const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -31,9 +28,10 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
         Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // Distance in meters
+    return R * c;
 }
 
+/** Reverse geocode with offsets as a fallback when no places are found */
 async function fetchGeocodingFallback(lat, lng) {
     const offsets = [
         [0, 0],
@@ -134,7 +132,7 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
             'walgreens'
         ];
 
-        // Blacklisted keywords - exclude any place containing these words
+        // Blacklisted keywords — exclude any place containing these words
         const blacklistKeywords = [
             'pharmacy',
             'auto care',
@@ -143,19 +141,10 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
             'optical'
         ];
 
-        // Food types for filtering (New API type names)
-        const foodTypes = [
-            'restaurant',
-            'cafe',
-            'bakery',
-            'bar',
-            'meal_delivery',
-            'meal_takeaway',
-            'supermarket',
-            'grocery_store',         // was grocery_or_supermarket
-            'store',
-            'shopping_mall',
-            'convenience_store'
+        // Food-related keywords — matches any Google type containing these
+        const foodKeywords = [
+            'restaurant', 'cafe', 'bakery', 'bar', 'food', 'shop',
+            'meal', 'supermarket', 'grocery', 'store', 'mall', 'convenience'
         ];
 
         // Helper function to filter results based on mode
@@ -183,16 +172,16 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
                     return isMajorRetailer;
                 }
 
-                // NORMAL MODE: Food types OR major retailers
-                const hasFoodType = p.types?.some(t => foodTypes.includes(t));
+                // NORMAL MODE: Food-related types OR major retailers
+                const hasFoodType = p.types?.some(t =>
+                    foodKeywords.some(kw => t.includes(kw))
+                );
                 return hasFoodType || isMajorRetailer;
             });
         };
 
         // Initial search with 100m radius
         let rawPlaces = await searchNearby(rLat, rLng, 100.0);
-
-        const modeLabel = (groceryMode === 'true' || groceryMode === true) ? 'GROCERY' : 'NORMAL';
         console.log(`✅ 100m search returned ${rawPlaces.length} results`);
 
         let filteredPlaces = [];
@@ -207,7 +196,6 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
             console.log("🔄 No places in 100m, expanding to 500m");
 
             rawPlaces = await searchNearby(rLat, rLng, 500.0);
-
             console.log(`✅ 500m search returned ${rawPlaces.length} results`);
 
             if (rawPlaces.length > 0) {
@@ -220,8 +208,7 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
         if (filteredPlaces.length > 0) {
             const placesWithDistance = filteredPlaces.map(p => {
                 const distance = calculateDistance(
-                    rLat,
-                    rLng,
+                    rLat, rLng,
                     p.location.latitude,
                     p.location.longitude
                 );
@@ -234,7 +221,6 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
                     address: p.shortFormattedAddress ?? p.formattedAddress ?? "",
                     lat: p.location.latitude,
                     lng: p.location.longitude,
-                    rating: p.rating ?? null,
                     distance: distance,
                     isMajorRetailer: majorRetailers.some(r =>
                         nameLower === r || nameLower.startsWith(r)
@@ -266,7 +252,7 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
         }
     }
 
-    // Fallback if no places
+    // Fallback if no places found
     if (places.length === 0) {
         console.log("⚠️ No places found, falling back to Geocoding");
         const fallbackResults = await fetchGeocodingFallback(lat, lng);
@@ -274,8 +260,7 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
             name: p.name,
             address: p.address,
             lat,
-            lng,
-            rating: null
+            lng
         }));
     }
 
