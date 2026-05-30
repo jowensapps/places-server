@@ -184,6 +184,11 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
         let rawPlaces = await searchNearby(rLat, rLng, 100.0);
         console.log(`✅ 100m search returned ${rawPlaces.length} results`);
 
+//// TEMP DEBUG: log all place names and types
+rawPlaces.forEach(p => {
+    console.log(`  📋 ${p.displayName?.text}: [${p.types?.join(', ')}]`);
+});
+
         let filteredPlaces = [];
 
         if (rawPlaces.length > 0) {
@@ -197,6 +202,11 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
 
             rawPlaces = await searchNearby(rLat, rLng, 500.0);
             console.log(`✅ 500m search returned ${rawPlaces.length} results`);
+
+//// TEMP DEBUG: log all place names and types
+rawPlaces.forEach(p => {
+    console.log(`  📋 ${p.displayName?.text}: [${p.types?.join(', ')}]`);
+});
 
             if (rawPlaces.length > 0) {
                 filteredPlaces = filterPlaces(rawPlaces);
