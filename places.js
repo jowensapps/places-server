@@ -6,13 +6,13 @@ const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const CACHE_TTL_SECONDS = 2592000; // 30 days
 
 function roundCoord(value) {
-    return Math.floor(value * 10000) / 10000;
+    return Math.floor(value * 1000) / 1000;
 }
 
 function makeCacheKey(lat, lng, groceryMode, allPlaces) {
     const mode = allPlaces === 'true' || allPlaces === true ? 'all'
         : groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v14:${lat}:${lng}:${mode}`;
+    return `places:v15:${lat}:${lng}:${mode}`;
 }
 
 /** Calculate distance between two points in meters using Haversine formula */
@@ -182,14 +182,9 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
             });
         };
 
-        // Initial search with 100m radius
-        let rawPlaces = await searchNearby(rLat, rLng, 100.0);
-        console.log(`✅ 100m search returned ${rawPlaces.length} results`);
-
-        //// TEMP DEBUG: log all place names and types
-        rawPlaces.forEach(p => {
-            console.log(`  📋 ${p.displayName?.text}: [${p.types?.join(', ')}]`);
-        });
+        // Initial search with 250m radius
+        let rawPlaces = await searchNearby(rLat, rLng, 250.0);
+        console.log(`✅ 250m search returned ${rawPlaces.length} results`);
 
         let filteredPlaces = [];
 
@@ -204,11 +199,6 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
 
             rawPlaces = await searchNearby(rLat, rLng, 500.0);
             console.log(`✅ 500m search returned ${rawPlaces.length} results`);
-
-        //// TEMP DEBUG: log all place names and types
-        rawPlaces.forEach(p => {
-            console.log(`  📋 ${p.displayName?.text}: [${p.types?.join(', ')}]`);
-        });
 
             if (rawPlaces.length > 0) {
                 filteredPlaces = filterPlaces(rawPlaces);
