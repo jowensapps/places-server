@@ -183,7 +183,7 @@ export async function getNearbyPlaces({ lat, lng, groceryMode, allPlaces }) {
         };
 
         // Initial search with 100m radius
-        let rawPlaces = await searchNearby(rLat, rLng, 250.0);
+        let rawPlaces = await searchNearby(rLat, rLng, 100.0);
         console.log(`✅ 100m search returned ${rawPlaces.length} results`);
 
         //// TEMP DEBUG: log all place names and types
