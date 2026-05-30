@@ -6,13 +6,13 @@ const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const CACHE_TTL_SECONDS = 2592000; // 30 days
 
 function roundCoord(value) {
-    return Math.floor(value * 1000) / 1000;
+    return Math.floor(value * 10000) / 10000;
 }
 
 function makeCacheKey(lat, lng, groceryMode, allPlaces) {
     const mode = allPlaces === 'true' || allPlaces === true ? 'all'
         : groceryMode === 'true' || groceryMode === true ? 'grocery' : 'normal';
-    return `places:v15:${lat}:${lng}:${mode}`;
+    return `places:v16:${lat}:${lng}:${mode}`;
 }
 
 /** Calculate distance between two points in meters using Haversine formula */
